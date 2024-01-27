@@ -5,6 +5,7 @@ import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
 
+
 const generateAcessAndRefreshToken = async (userId) => {
     try {
         const user = await User.findById(userId)
@@ -15,7 +16,8 @@ const generateAcessAndRefreshToken = async (userId) => {
 
         return { accessToken, refreshToken }
     } catch (error) {
-        throw new ApiError(500, "Something went wrong while genrating refersh and sccess tiken")
+        // throw new ApiError(500, "Something went wrong while genrating refersh and success Token")
+        throw new ApiError(500, `${error}`)
     }
 }
 
@@ -51,11 +53,15 @@ const registerUser = asyncHandler(async (req, res) => {
 
     // 4.upload them to cloudinary, avatar
     // const avatarLocalPath = req.files?.avatar[0]?.path;
-    const avatarLocalPath = req.files?.avatar[0]?.path;
+    const avatarLocalPath = req.files?.avatar?.[0]?.path;
     // const coverImageLocalPath = req.files?.coverImage[0].path;
+    // let coverImageLocalPath;
+    // if (req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0) {
+    //     coverImageLocalPath = req.files.coverImage[0].path
+    // }
     let coverImageLocalPath;
-    if (req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0) {
-        coverImageLocalPath = req.files.coverImage[0].path
+    if (req.files && req.files.coverImage && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0) {
+        coverImageLocalPath = req.files.coverImage[0].path;
     }
 
 
@@ -112,7 +118,7 @@ const loginUser = asyncHandler(async (req, res) => {
     const { email, username, password } = req.body
     // 2.username or email
 
-    if (!username || !email) {
+    if (!(username || email)) {
         throw new ApiError(400, "Username or Email is required")
     }
 
@@ -125,14 +131,26 @@ const loginUser = asyncHandler(async (req, res) => {
         throw new ApiError(404, "User does not Exist")
     }
     //4.password check
-    const isPasswordValid = await user.isPasswordCorrect(password)
+    // const isPasswordValid = await user.isPasswordCorrect(password);
+    // if (!isPasswordValid) {
+    //     throw new ApiError(401, "Invalid user credentials")
+    // }
+
+    //problem is here it is not rturning true
+    const isPasswordValid = await user.isPasswordCorrect(password);
+    // const isPasswordValid = await bcrypt.compare(password.trim(), user.password);
+
+
     if (!isPasswordValid) {
-        throw new ApiError(401, "Invalid user credentials")
+        // console.log(`Provided Password:${password}`);
+        // console.log(`Stored Password Hash:${user.password}`); // Make sure this is a hashed password
+        throw new ApiError(401, "Invalid user credentials");
     }
+
     const { accessToken, refreshToken } = await generateAcessAndRefreshToken(user._id)
 
     //costly call 
-    const loggedInUser = await User.findById(user._id).select("-password -refershToken")
+    const loggedInUser = await User.findById(user._id).select("-password -refreshToken")
 
     const options = {
         httpOnly: true,
@@ -152,6 +170,7 @@ const loginUser = asyncHandler(async (req, res) => {
                 "User logged In Successfully"
             )
         )
+
 })
 
 
