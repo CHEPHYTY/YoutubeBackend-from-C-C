@@ -49,6 +49,6 @@ router.route("/cover-image").patch(verifyJWT, upload.single("/coverImage"), upda
 
 router.route("/c/:username").get(verifyJWT, getUserChannelProfile)
 
-router.route("/wathc-history").get(verifyJWT, getWatchHistory)
+router.route("/watch-history").get(verifyJWT, getWatchHistory)
 
 export default router

@@ -8,7 +8,7 @@ import mongoose from "mongoose";
 
 
 
-const generateAcessAndRefreshToken = async (userId) => {
+const generateAccessAndRefereshTokens = async (userId) => {
     try {
         const user = await User.findById(userId)
         const accessToken = user.generateAccessToken()
@@ -149,7 +149,7 @@ const loginUser = asyncHandler(async (req, res) => {
         throw new ApiError(401, "Invalid user credentials");
     }
 
-    const { accessToken, refreshToken } = await generateAcessAndRefreshToken(user._id)
+    const { accessToken, refreshToken } = await generateAccessAndRefereshTokens(user._id)
 
     //costly call 
     const loggedInUser = await User.findById(user._id).select("-password -refreshToken")
@@ -215,7 +215,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
             process.env.REFRESH_TOKEN_SECRET
         )
 
-        const user = await User.findById(decodedToken, _id)
+        const user = await User.findById(decodedToken?._id)
 
         if (!user) {
             throw new ApiError(401, "Invalid refresh token")
@@ -231,24 +231,22 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
             secure: true
         }
 
-        const { accessToken, newRefreshToken } = await generateAcessAndRefreshToken(user._id)
+        const { accessToken, newRefreshToken } = await generateAccessAndRefereshTokens(user._id)
 
-
-        return res.status(200)
+        return res
+            .status(200)
             .cookie("accessToken", accessToken, options)
             .cookie("refreshToken", newRefreshToken, options)
             .json(
-                200, {
-                accessToken, refreshToken: newRefreshToken
-            },
-                "Access Token refresh Successfully"
+                new ApiResponse(
+                    200,
+                    { accessToken, refreshToken: newRefreshToken },
+                    "Access token refreshed"
+                )
             )
-
-
     } catch (error) {
-        throw new ApiError(401, error?.message || "Invalid refresh Token")
+        throw new ApiError(401, error?.message || "Invalid refresh token")
     }
-
 })
 
 const changeCurrentPassword = asyncHandler(async (req, res) => {
@@ -273,6 +271,10 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
 
 
 const getCurrentUser = asyncHandler(async (req, res) => {
+    // const {accessToken} = req.body
+    // if(!accessToken){
+
+    // }
     return res.status(200)
         .json(new ApiResponse(200, req.user, "Current user fetched successfully"))
 })
@@ -365,7 +367,8 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
 
 const getUserChannelProfile = asyncHandler(async (req, res) => {
     const { username } = req.params
-    if (!username.trim()) {
+
+    if (!username?.trim()) {
         throw new ApiError(400, "username is missing")
     }
 
@@ -377,7 +380,7 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
         },
         {
             $lookup: {
-                from: "subscription",
+                from: "subscriptions",
                 localField: "_id",
                 foreignField: "channel",
                 as: "subscribers"
@@ -385,7 +388,7 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
         },
         {
             $lookup: {
-                from: "subscription",
+                from: "subscriptions",
                 localField: "_id",
                 foreignField: "subscriber",
                 as: "subscribedTo"
@@ -393,7 +396,7 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
         },
         {
             $addFields: {
-                subscriberCount: {
+                subscribersCount: {
                     $size: "$subscribers"
                 },
                 channelsSubscribedToCount: {
@@ -401,7 +404,7 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
                 },
                 isSubscribed: {
                     $cond: {
-                        if: { $in: [req.user?._id, "$subscrbers.subscriber"] },
+                        if: { $in: [req.user?._id, "$subscribers.subscriber"] },
                         then: true,
                         else: false
                     }
@@ -412,24 +415,26 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
             $project: {
                 fullName: 1,
                 username: 1,
-                subscriberCount: 1,
+                subscribersCount: 1,
                 channelsSubscribedToCount: 1,
                 isSubscribed: 1,
                 avatar: 1,
                 coverImage: 1,
-                email: 1,
+                email: 1
+
             }
         }
-
     ])
 
     if (!channel?.length) {
-        throw new ApiError(404, "channel does not Exists")
+        throw new ApiError(404, "channel does not exists")
     }
 
     return res
         .status(200)
-        .json(new ApiResponse(200, "User channel fetched succefully"))
+        .json(
+            new ApiResponse(200, channel[0], "User channel fetched successfully")
+        )
 })
 
 
